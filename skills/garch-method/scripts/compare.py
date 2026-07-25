@@ -141,12 +141,19 @@ def sharpe_diff_ci(a: np.ndarray, b: np.ndarray, periods_per_year: int,
         idx = (starts[:, None] + np.arange(block)[None, :]).ravel()[:n] % n
         diffs[i] = sh(a[idx]) - sh(b[idx])
     observed = sh(a) - sh(b)
+    lo = float(np.percentile(diffs, 2.5))
+    hi = float(np.percentile(diffs, 97.5))
+    # A CI entirely below zero is just as significant as one entirely above it —
+    # it means the overlay measurably HURT. Reporting that as "not significant"
+    # would bury the most actionable result the harness can produce.
+    verdict = "improvement" if lo > 0 else "harm" if hi < 0 else "inconclusive"
     return {
         "sharpe_difference": round(observed, 3),
-        "ci95_low": round(float(np.percentile(diffs, 2.5)), 3),
-        "ci95_high": round(float(np.percentile(diffs, 97.5)), 3),
+        "ci95_low": round(lo, 3),
+        "ci95_high": round(hi, 3),
         "prob_no_improvement": round(float((diffs <= 0).mean()), 3),
-        "significant_at_95": bool(np.percentile(diffs, 2.5) > 0),
+        "verdict": verdict,
+        "significant_at_95": verdict != "inconclusive",
     }
 
 
@@ -311,9 +318,14 @@ def main():
         print(f"\n  Sharpe(vol-targeted) - Sharpe(fixed) = {sig_test['sharpe_difference']:+}")
         print(f"  block-bootstrap 95% CI: [{sig_test['ci95_low']:+}, {sig_test['ci95_high']:+}]"
               f"   P(no improvement) = {sig_test['prob_no_improvement']}")
-        if not sig_test["significant_at_95"]:
-            print("  → NOT significant at 95%. On this sample, vol targeting has not been "
-                  "shown to help.")
+        verdict = {
+            "improvement": "  → Vol targeting improved Sharpe, significantly at 95%.",
+            "harm": "  → Vol targeting made this strategy WORSE, significantly at 95%. "
+                    "The confidence interval lies entirely below zero.",
+            "inconclusive": "  → NOT significant at 95%. On this sample, vol targeting has "
+                            "not been shown to help.",
+        }[sig_test["verdict"]]
+        print(verdict)
 
     print(f"\n  risk-matched --target-vol would be ~{diag['risk_matched_target_vol_pct']}% "
           f"(fixed arm's own realized vol)")

@@ -90,9 +90,32 @@ def test_signal_applies_to_the_next_bar(small_prices):
 
 def test_significance_is_reported_with_an_error_bar(result):
     _, _, sig, _ = result
-    assert {"sharpe_difference", "ci95_low", "ci95_high",
-            "prob_no_improvement", "significant_at_95"} <= set(sig)
+    assert {"sharpe_difference", "ci95_low", "ci95_high", "prob_no_improvement",
+            "verdict", "significant_at_95"} <= set(sig)
     assert sig["ci95_low"] <= sig["sharpe_difference"] <= sig["ci95_high"]
+
+
+def test_significant_harm_is_not_reported_as_inconclusive():
+    """
+    A CI entirely below zero means the overlay measurably hurt. Reporting that
+    as "not significant" would bury the most actionable result the harness has.
+    """
+    rng = np.random.default_rng(3)
+    base = rng.standard_normal(3000) / 100
+    worse = base - 0.0015                       # same shape, materially worse mean
+    out = sharpe_diff_ci(worse, base, 252, reps=500)
+    assert out["sharpe_difference"] < 0
+    assert out["ci95_high"] < 0
+    assert out["verdict"] == "harm"
+    assert out["significant_at_95"] is True
+
+
+def test_clear_improvement_is_flagged():
+    rng = np.random.default_rng(4)
+    base = rng.standard_normal(3000) / 100
+    better = base + 0.0015
+    out = sharpe_diff_ci(better, base, 252, reps=500)
+    assert out["verdict"] == "improvement" and out["significant_at_95"] is True
 
 
 def test_significance_flags_a_null_difference():
