@@ -60,7 +60,7 @@ Upstream is a solid demo. These are the changes that make it safe to run against
 - Diagnostics for how often sizing was pinned at the floor or the cap, and the risk-matched `--target-vol` to use.
 - Signal timing convention documented explicitly, and signals outside [-1, 1] or with duplicate dates are rejected.
 
-**Tests** — 24 of them, offline, in `tests/`. The two that matter pin the refit seeding against `arch`'s own forecast, and assert that a one-day signal earns the *following* day's return.
+**Tests** — 26 of them, offline, in `tests/`. The two that matter pin the refit seeding against `arch`'s own forecast, and assert that a one-day signal earns the *following* day's return.
 
 ## Results on real data
 

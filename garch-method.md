@@ -27,10 +27,10 @@ This is the volatility-targeting machinery real risk desks run — the family of
    Fetch each file verbatim and write it exactly as published — do not improvise the math.
    These URLs are **pinned to a release tag**, not a moving branch, so what you install is
    what was reviewed:
-   - https://raw.githubusercontent.com/patzoul/garchmethod/v1.1.0/skills/garch-method/SKILL.md
-   - https://raw.githubusercontent.com/patzoul/garchmethod/v1.1.0/skills/garch-method/scripts/garch_forecast.py
-   - https://raw.githubusercontent.com/patzoul/garchmethod/v1.1.0/skills/garch-method/scripts/vol_target.py
-   - https://raw.githubusercontent.com/patzoul/garchmethod/v1.1.0/skills/garch-method/scripts/compare.py
+   - https://raw.githubusercontent.com/patzoul/garchmethod/v1.1.1/skills/garch-method/SKILL.md
+   - https://raw.githubusercontent.com/patzoul/garchmethod/v1.1.1/skills/garch-method/scripts/garch_forecast.py
+   - https://raw.githubusercontent.com/patzoul/garchmethod/v1.1.1/skills/garch-method/scripts/vol_target.py
+   - https://raw.githubusercontent.com/patzoul/garchmethod/v1.1.1/skills/garch-method/scripts/compare.py
 4. **Run the sanity check** — this is the proof-of-life, and it should be the FIRST thing the user sees working:
    `uv run skills/garch-method/scripts/compare.py --ticker BTC-USD --target-vol 58 --cost-bps 10 --chart equity_comparison.png`
    If yfinance is unreachable, generate 2,000 days of synthetic prices with visible volatility clustering and run on that instead, clearly labeled DEMO DATA.
