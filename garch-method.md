@@ -13,7 +13,7 @@ The skill you are about to install answers the question every hedge fund asks da
 * Produces a 1-day-ahead **volatility forecast** — how violent tomorrow is likely to be. (Not which way it goes. GARCH forecasts magnitude, never direction — the skill says this in its own output.)
 * Classifies the current **vol regime**: calm / normal / storm (percentile vs the trailing year).
 * Converts the forecast into a **position size**: `target_vol / forecast_vol`, capped at [0.25x, 2.0x]. Storm coming → smaller. Calm → bigger.
-* Runs the **honest test**: any strategy's signals, sized two ways — fixed vs vol-targeted — with both equity curves and Sharpe / max drawdown / worst month side by side. Ships with an EMA 9/21 crossover demo strategy; accepts your own via a signals CSV.
+* Runs the **honest test**: any strategy's signals, sized two ways — fixed vs vol-targeted — against buy-and-hold, **net of trading costs**, with equity curves, Sharpe / max drawdown / worst month / turnover side by side, and a bootstrap confidence interval on the Sharpe difference. (Costs matter: the vol-targeted arm re-sizes daily and turns over roughly twice as much as the fixed arm, so a zero-cost comparison flatters it by construction.) Ships with an EMA 9/21 crossover demo strategy; accepts your own via a signals CSV.
 
 This is the volatility-targeting machinery real risk desks run — the family of models that won the 2003 Nobel Prize in Economics (Engle's ARCH; Bollerslev's GARCH extension).
 
@@ -22,17 +22,19 @@ This is the volatility-targeting machinery real risk desks run — the family of
 1. **Detect the OS** and say what you found. No sudo, no API keys, no accounts anywhere in this process.
 2. **Ensure `uv` is installed** (the Python runner). If missing, install it from astral.sh using the official installer for the detected OS. All Python dependencies (arch, pandas, numpy, matplotlib) resolve automatically on first run via PEP 723 inline metadata — nothing to pip-install.
 3. **Create the skill** at the appropriate skills location for this machine, with this structure:
-   - `skills/garch/SKILL.md` — the skill contract
-   - `scripts/garch_forecast.py`, `scripts/vol_target.py`, `scripts/compare.py`
-   Fetch each file verbatim from the repository and write it exactly as published — do not improvise the math:
-   - https://raw.githubusercontent.com/milesdeutscher/garchmethod/main/skills/garch/SKILL.md
-   - https://raw.githubusercontent.com/milesdeutscher/garchmethod/main/scripts/garch_forecast.py
-   - https://raw.githubusercontent.com/milesdeutscher/garchmethod/main/scripts/vol_target.py
-   - https://raw.githubusercontent.com/milesdeutscher/garchmethod/main/scripts/compare.py
+   - `skills/garch-method/SKILL.md` — the skill contract
+   - `skills/garch-method/scripts/garch_forecast.py`, `.../vol_target.py`, `.../compare.py`
+   Fetch each file verbatim and write it exactly as published — do not improvise the math.
+   These URLs are **pinned to a release tag**, not a moving branch, so what you install is
+   what was reviewed:
+   - https://raw.githubusercontent.com/patzoul/garchmethod/v1.1.0/skills/garch-method/SKILL.md
+   - https://raw.githubusercontent.com/patzoul/garchmethod/v1.1.0/skills/garch-method/scripts/garch_forecast.py
+   - https://raw.githubusercontent.com/patzoul/garchmethod/v1.1.0/skills/garch-method/scripts/vol_target.py
+   - https://raw.githubusercontent.com/patzoul/garchmethod/v1.1.0/skills/garch-method/scripts/compare.py
 4. **Run the sanity check** — this is the proof-of-life, and it should be the FIRST thing the user sees working:
-   `uv run scripts/compare.py --ticker BTC-USD --target-vol 58 --chart equity_comparison.png`
+   `uv run skills/garch-method/scripts/compare.py --ticker BTC-USD --target-vol 58 --cost-bps 10 --chart equity_comparison.png`
    If yfinance is unreachable, generate 2,000 days of synthetic prices with visible volatility clustering and run on that instead, clearly labeled DEMO DATA.
-5. **Show the result**: open or display the equity chart, and read out the side-by-side stats. Point at the drawdown and worst-month lines — that's where sizing shows up.
+5. **Show the result**: open or display the equity chart, and read out the side-by-side stats. Point at the drawdown and worst-month lines — that's where sizing shows up. Then read out the confidence interval on the Sharpe difference. If it straddles zero, say so plainly: on this sample vol targeting has not been shown to improve risk-adjusted return, only drawdown. Do not sell the point estimate.
 6. **Explain invocation** in one breath: from now on they can just ask in plain English — "what's the vol forecast on BTC", "how big should my SPY position be", "test my strategy with vol targeting" — and the skill fires.
 
 ## Rules
