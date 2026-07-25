@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["arch>=6.0", "pandas>=2.0", "numpy>=1.24"]
+# dependencies = ["arch>=6.0", "pandas>=2.2", "numpy>=1.24", "yfinance>=0.2.40"]
 # ///
 """
 vol_target.py — turn a volatility forecast into a position size.
@@ -11,9 +11,15 @@ The entire idea in one line:
 Storm coming -> smaller position. Calm ahead -> bigger position.
 Same trades, different sizes. This is the "how much" answer.
 
+Note on the floor: `min_size` defaults to 0.25, which means the sizing rule
+never takes you flat. If you want a true kill-switch, pass --min-size 0.
+When there is NO forecast at all (before the warm-up window), size is 0 — no
+forecast means no position, not a quarter position.
+
 Usage:
   uv run vol_target.py --csv prices.csv --target-vol 15
   uv run vol_target.py --csv prices.csv --target-vol 15 --json
+  uv run vol_target.py --csv prices.csv --target-vol 15 --min-size 0   # kill-switch
 """
 
 import argparse
@@ -28,17 +34,17 @@ MIN_SIZE = 0.25
 
 def size_from_vol(forecast_vol_ann: float, target_vol_ann: float = 15.0,
                   max_leverage: float = MAX_LEVERAGE, min_size: float = MIN_SIZE) -> float:
-    """Position size multiplier from an annualized vol forecast (%)."""
-    if forecast_vol_ann is None or forecast_vol_ann <= 0 or np.isnan(forecast_vol_ann):
-        return min_size
+    """Position size multiplier from an annualized vol forecast (%). No forecast -> 0."""
+    if forecast_vol_ann is None or np.isnan(forecast_vol_ann) or forecast_vol_ann <= 0:
+        return 0.0
     return float(np.clip(target_vol_ann / forecast_vol_ann, min_size, max_leverage))
 
 
 def size_series(fcast_vol_ann: pd.Series, target_vol_ann: float = 15.0,
                 max_leverage: float = MAX_LEVERAGE, min_size: float = MIN_SIZE) -> pd.Series:
-    """Vectorized version for backtests."""
-    s = target_vol_ann / fcast_vol_ann
-    return s.clip(lower=min_size, upper=max_leverage).fillna(min_size)
+    """Vectorized version for backtests. Days with no forecast get size 0."""
+    s = target_vol_ann / fcast_vol_ann.where(fcast_vol_ann > 0)
+    return s.clip(lower=min_size, upper=max_leverage).fillna(0.0)
 
 
 def main():
@@ -50,13 +56,19 @@ def main():
     ap.add_argument("--target-vol", type=float, default=15.0,
                     help="annualized target vol %% (default 15)")
     ap.add_argument("--periods-per-year", type=int, default=365)
+    ap.add_argument("--max-leverage", type=float, default=MAX_LEVERAGE)
+    ap.add_argument("--min-size", type=float, default=MIN_SIZE,
+                    help="size floor; pass 0 for a true kill-switch (default 0.25)")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--no-strict-data", action="store_true",
+                    help="downgrade fatal data-quality problems to warnings")
     args = ap.parse_args()
 
-    prices = load_prices(csv=args.csv, ticker=args.ticker)
+    prices = load_prices(csv=args.csv, ticker=args.ticker, strict=not args.no_strict_data)
     res = walkforward_garch(prices, periods_per_year=args.periods_per_year)
     latest = res.dropna(subset=["fcast_vol"]).iloc[-1]
-    mult = size_from_vol(float(latest["fcast_vol_ann"]), args.target_vol)
+    mult = size_from_vol(float(latest["fcast_vol_ann"]), args.target_vol,
+                         args.max_leverage, args.min_size)
 
     payload = {
         "as_of": str(latest["date"].date()),
@@ -64,7 +76,7 @@ def main():
         "target_vol_pct": args.target_vol,
         "position_size_multiplier": round(mult, 2),
         "read_as": f"run {round(mult, 2)}x your baseline position size",
-        "caps": {"max": MAX_LEVERAGE, "min": MIN_SIZE},
+        "caps": {"max": args.max_leverage, "min": args.min_size},
         "note": HONESTY_NOTE,
     }
     if args.json:
